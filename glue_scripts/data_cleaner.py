@@ -49,7 +49,7 @@ Optional Job Parameters (examples):
 - `--CUSTOM_VALIDATION_RULES_JSON`: '[{"column": "age", "rule": "age < 0", "action": "drop_row"}]'
 - `--DATE_FORMATS_TO_TRY`: "yyyy-MM-dd,MM/dd/yyyy"
 
-Author: [Sai Gowtham Reddy Udumula]
+Author: Sai Gowtham Reddy Udumula
 """
 import sys
 import json
