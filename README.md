@@ -1,133 +1,162 @@
 Automatic ETL Data Cleaning Pipeline (AWS + PySpark)
-This project implements a highly configurable and robust ETL (Extract, Transform, Load) pipeline on AWS using PySpark, designed to automatically clean and transform diverse datasets. It demonstrates a cloud-native approach to data quality, ensuring data is production-ready for analytics and machine learning applications.
+A highly configurable, cloud-native ETL pipeline built with AWS and PySpark to automate data ingestion, cleaning, transformation, and validation for analytics and machine learning applications.
 
-Project Overview
-The core objective of this pipeline is to automate the process of ingesting raw data from Amazon S3, applying a wide range of data cleaning and transformation rules, and then storing the processed data back into S3. The pipeline is built with extensibility and reusability in mind, allowing its behavior to be customized via job parameters without altering the underlying code.
+Overview
+This project implements a robust, serverless ETL (Extract, Transform, Load) pipeline on AWS using PySpark. It automates the process of ingesting raw data from Amazon S3, applying comprehensive data cleaning and transformation rules, and storing processed data back into S3 in an optimized format (e.g., Parquet). Designed for extensibility and reusability, the pipeline is fully customizable via AWS Glue job parameters, eliminating the need for code modifications.
+The pipeline ensures production-ready data quality by handling diverse datasets, enforcing validation rules, detecting outliers, and generating detailed data quality reports.
 
 Key Features
-Flexible Data Ingestion: Supports reading data in CSV, JSON, and Parquet formats from S3.
+
+Flexible Data Ingestion:
+Supports CSV, JSON, and Parquet formats from S3.
+
 
 Configurable Data Cleaning:
-
-Automatic trimming of whitespace from all string columns.
-
+Automatic whitespace trimming for string columns.
 Standardization of string case (lowercase, uppercase, or title case).
-
 Removal of non-alphanumeric characters from specified columns.
 
+
 Intelligent Type Conversion:
+Explicit type casting based on user-provided mappings.
+Automatic type inference for strings to numeric, boolean, date, or timestamp formats.
+Robust handling of numeric overflow (truncate, nullify, or convert to string).
 
-Explicit type casting for columns based on a provided mapping.
-
-Automatic inference and conversion for string columns to appropriate data types (numeric, boolean, date, timestamp) by attempting multiple common formats.
-
-Robust handling of numeric overflow during casting (truncation, nullification, or conversion to string).
 
 Comprehensive Null Handling:
+Drop rows with nulls in critical columns (e.g., identifiers).
+Configurable null-filling strategies for non-critical columns (strings, numbers, dates, booleans).
 
-Ability to drop entire rows if critical identifier columns contain nulls.
-
-Configurable strategies for filling nulls in non-critical columns based on their data type (strings, numbers, dates, booleans).
 
 Advanced Data Quality & Validation:
+Custom Validation Rules: Apply user-defined rules with actions like dropping rows, setting nulls, or quarantining invalid records.
+Outlier Detection: Supports IQR, Z-score, or simplified isolation forest methods for numeric columns.
+Duplicate Removal: Configurable deduplication based on specific columns or entire rows.
+Schema Validation: Optional validation against a predefined schema.
 
-Custom Validation Rules: Apply user-defined validation rules with flexible actions (e.g., drop invalid rows, set values to null, set default values, flag records, or quarantine).
 
-Outlier Detection: Integrated methods for identifying outliers in numeric columns (IQR, Z-score, simplified isolation forest).
+Data Profiling & Metrics:
+Generates detailed data quality reports with completeness, consistency, and validity metrics, saved to S3.
 
-Duplicate Removal: Configurable to remove duplicates based on a subset of columns or all columns.
 
-Schema Validation: Optional validation of input data schema against a predefined structure.
+Data Enrichment:
+Add derived columns using Spark SQL expressions.
 
-Data Profiling & Metrics: Generates a comprehensive data quality report, including overall completeness, consistency, validity scores, and detailed column-level statistics. This report is written to S3.
 
-Data Enrichment: Supports the addition of new derived columns using powerful Spark SQL expressions.
+Auditability:
+Adds metadata columns (e.g., ETL timestamps, Glue job IDs, source paths, row hashes) for traceability.
 
-Auditability: Automatically adds metadata columns such as ETL load timestamps, Glue job IDs, source paths, and a unique row hash for traceability and lineage tracking.
 
-Performance Optimization: Includes Spark configuration tuning, dynamic repartitioning based on data volume, and caching mechanisms to optimize processing performance.
+Performance Optimization:
+Dynamic repartitioning, caching, and Spark configuration tuning for efficient processing.
 
-Architecture & Flow
-This pipeline is designed as an an event-driven, serverless architecture on AWS:
 
-Data Landing: Raw data files (e.g., CSVs) are uploaded to a designated S3 bucket (e.g., s3://your-raw-data-bucket/raw_data_folder/).
 
-Event Trigger: An S3 event notification (e.g., ObjectCreated) for the raw data folder triggers an AWS Lambda function.
 
-Crawler Initiation: This initial Lambda function's role is to start an AWS Glue Crawler. The Lambda function completes quickly, avoiding timeouts.
+Architecture
+This pipeline leverages a serverless, event-driven architecture on AWS:
 
-Metadata Cataloging: The Glue Crawler processes the newly uploaded file(s), infers the schema, and updates the AWS Glue Data Catalog, making the data discoverable.
+Data Landing: Raw data is uploaded to an S3 bucket (e.g., s3://your-raw-data-bucket/raw_data_folder/).
+Event Trigger: S3 ObjectCreated events trigger a Lambda function.
+Crawler Initiation: The Lambda function starts an AWS Glue Crawler to infer the schema and update the Glue Data Catalog.
+Job Orchestration: An Amazon EventBridge rule detects the crawler's SUCCEEDED state and triggers a second Lambda function.
+ETL Execution: The second Lambda function launches the AWS Glue ETL job, which runs the generalized_data_cleaner.py script on a dedicated Spark cluster.
+Cleaned Data Output: Processed data is written to a target S3 bucket (e.g., s3://your-transformed-data-bucket/transformed_data_folder/) in Parquet format.
+Data Quality Metrics: A comprehensive data quality report is saved to S3.
+Quarantine Zone: Invalid records are optionally written to a quarantine S3 location for further analysis.
 
-Job Orchestration (EventBridge): Upon successful completion of the Glue Crawler, an Amazon EventBridge rule detects the Crawler State Change event (SUCCEEDED).
+This design ensures scalability, cost-efficiency, and fault tolerance.
 
-ETL Job Trigger: The EventBridge rule then triggers a second AWS Lambda function.
+Technologies
 
-Main ETL Execution: This second Lambda function starts the main AWS Glue ETL job (running the generalized_data_cleaner.py script). This Glue job runs on its own dedicated Spark cluster, allowing for long-running transformations.
-
-Cleaned Data Output: The Glue ETL job performs all the cleaning, transformation, and validation steps, then writes the cleaned data to a separate S3 bucket (e.g., s3://your-transformed-data-bucket/transformed_data_folder/) in a optimized format like Parquet.
-
-Data Quality Metrics Output: If enabled, a data quality report is also written to S3.
-
-Quarantine Zone: Invalid records (based on validation rules) are optionally written to a separate S3 quarantine location for further investigation.
-
-This design ensures a robust, scalable, and cost-effective data cleaning solution.
-
-Technologies Used
 AWS Services: S3, Glue (ETL, Crawler), Lambda, EventBridge
+Framework: Apache Spark (PySpark)
+Language: Python
 
-Frameworks: Apache Spark (PySpark)
 
-Languages: Python
-
-How to Use (AWS Glue Job Parameters)
-This script's behavior is highly customizable through AWS Glue Job Parameters. When configuring the Glue job in the AWS Console, you would provide values for these parameters:
-
-Required Parameters:
+Usage
+The pipeline is configured via AWS Glue Job Parameters, allowing customization without code changes. Below are key parameters:
+Required Parameters
 
 --JOB_NAME: Unique name for the Glue job run.
+--S3_SOURCE_PATH: Input data path (e.g., s3://your-raw-bucket/data/).
+--S3_TARGET_PATH: Output data path (e.g., s3://your-cleaned-bucket/data/).
 
---S3_SOURCE_PATH: Full S3 path to the input raw data (e.g., s3://your-raw-bucket/data/).
-
---S3_TARGET_PATH: Full S3 path where cleaned data will be written (e.g., s3://your-cleaned-bucket/data/).
-
-Optional Parameters (Examples):
+Optional Parameters (Examples)
 
 --S3_QUARANTINE_PATH: s3://your-quarantine-bucket/invalid_records/
-
 --S3_METRICS_PATH: s3://your-metrics-bucket/dq_reports/
-
 --INPUT_FORMAT: csv (or json, parquet)
-
 --OUTPUT_FORMAT: parquet (or csv, json)
-
 --CRITICAL_NULL_COLUMNS: "customer_id,order_id"
-
 --TYPE_CONVERSION_MAP: '{"order_date":"date", "sales_amount":"decimal(10,2)", "is_active":"boolean"}'
-
 --FILL_NULL_STRINGS_WITH: "N/A"
-
 --STANDARDIZE_STRING_CASE: "lower"
-
 --CUSTOM_VALIDATION_RULES_JSON: '[{"column": "age", "rule": "age < 0", "action": "drop_row", "rule_name": "negative_age_check"}]'
-
 --DATE_FORMATS_TO_TRY: "yyyy-MM-dd,MM/dd/yyyy"
-
 --ENABLE_OUTLIER_DETECTION: "true"
-
 --OUTLIER_METHOD: "iqr"
+
 
 Project Structure
 Automatic_ETL_Data_Cleaning_Pipeline/
-├── README.md                           # This file
+├── README.md                           # Project documentation
 └── glue_scripts/
-    └── generalized_data_cleaner.py     # The main PySpark ETL script
-    └── lambda_functions/               # Optional: Lambda functions for orchestration
+    ├── generalized_data_cleaner.py     # Main PySpark ETL script
+    └── lambda_functions/
         ├── trigger_glue_crawler.py     # Lambda to trigger Glue Crawler
-        └── trigger_glue_job.py         # Lambda to trigger Glue ETL Job (triggered by EventBridge)
+        └── trigger_glue_job.py         # Lambda to trigger Glue ETL Job
+
+
+Setup Instructions
+
+Configure S3 Buckets:
+Create raw, transformed, quarantine, and metrics S3 buckets.
+
+
+Set Up Glue Crawler:
+Configure a Glue Crawler to catalog raw data in the source S3 bucket.
+
+
+Deploy Lambda Functions:
+Deploy trigger_glue_crawler.py and trigger_glue_job.py as Lambda functions.
+Assign appropriate IAM roles for S3, Glue, and EventBridge access.
+
+
+Configure EventBridge:
+Create a rule to trigger the second Lambda function on Glue Crawler SUCCEEDED events.
+
+
+Create Glue ETL Job:
+Upload generalized_data_cleaner.py to S3.
+Create a Glue job, specifying the script path and required parameters.
+
+
+Test the Pipeline:
+Upload a sample dataset to the raw S3 bucket.
+Monitor the pipeline via AWS CloudWatch and verify outputs in the target S3 bucket.
+
+
+
+
+Example
+To process a CSV file with customer data:
+
+Upload customers.csv to s3://your-raw-bucket/data/.
+The S3 event triggers the pipeline, which:
+Infers the schema via Glue Crawler.
+Cleans the data (e.g., trims whitespace, converts types, removes duplicates).
+Writes cleaned data to s3://your-cleaned-bucket/data/ in Parquet.
+Saves a data quality report to s3://your-metrics-bucket/dq_reports/.
+
+
+
 
 Author
 Sai Gowtham Reddy Udumula
 
-
 Version
 1.0
+
+License
+This project is licensed under the MIT License.
